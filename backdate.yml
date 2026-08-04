@@ -1,0 +1,19 @@
+name: Backdated commit
+on: workflow_dispatch
+
+jobs:
+  commit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          git config user.name "Your Name"
+          git config user.email "you@example.com"
+          echo "note" >> notes.md
+          git add notes.md
+          GIT_AUTHOR_DATE="2026-07-15T14:30:00+06:00" \
+          GIT_COMMITTER_DATE="2026-07-15T14:30:00+06:00" \
+          git commit -m "your message"
+          git push
