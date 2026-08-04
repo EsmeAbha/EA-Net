@@ -24,7 +24,6 @@ from eanet.tta.base import (
     collect_bn_params,
     configure_bn_model,
     copy_state,
-    inference_pass,
     load_state,
     softmax_entropy,
 )
@@ -91,6 +90,23 @@ class SAM(torch.optim.Optimizer):
     def step(self, closure=None):  # pragma: no cover - SAR drives the two phases directly
         raise RuntimeError("SAM requires explicit first_step()/second_step() calls")
 
+    def state_dict(self) -> dict:
+        """Delegate to the wrapped optimizer.
+
+        SAM holds two independent state dicts: its own (scratch space for the
+        ``e_w`` perturbations) and the base optimizer's (the momentum buffers
+        that actually matter). Serialising only the wrapper's would silently
+        drop the momentum, so a "reset" would leave the previous adaptation's
+        velocity in place.
+        """
+        return self.base_optimizer.state_dict()
+
+    def load_state_dict(self, state_dict: dict) -> None:
+        self.base_optimizer.load_state_dict(state_dict)
+        self.param_groups = self.base_optimizer.param_groups
+        # Drop any half-applied perturbation from an interrupted step.
+        self.state.clear()
+
 
 class SAR(TTAMethod):
     """Reliable entropy minimisation with sharpness awareness.
@@ -127,7 +143,10 @@ class SAR(TTAMethod):
         if not params:
             raise ValueError("model exposes no BatchNorm parameters; SAR has nothing to adapt")
         self.optimizer = SAM(params, torch.optim.SGD, rho=rho, lr=lr, momentum=0.9)
-        self._source_state = copy_state(self.model)
+        # The optimizer state must be snapshotted too: the base SGD carries
+        # momentum buffers, and restoring the weights alone would leave them
+        # pointing in the direction of the discarded adaptation.
+        self._source_state = copy_state(self.model, self.optimizer)
 
     def _margin(self, n_classes: int) -> float:
         return self.margin_ratio * math.log(n_classes)
@@ -141,7 +160,7 @@ class SAR(TTAMethod):
             # the model is predicting one class with full confidence.
             self.reset()
 
-        with inference_pass(self.model), torch.no_grad():
+        with torch.no_grad():
             return self.model(x)
 
     def _adapt_once(self, x: torch.Tensor) -> None:
@@ -179,5 +198,5 @@ class SAR(TTAMethod):
             )
 
     def reset(self) -> None:
-        load_state(self.model, self._source_state)
+        load_state(self.model, self._source_state, self.optimizer)
         self.ema_loss = None

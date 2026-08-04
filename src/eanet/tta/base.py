@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import copy
 from abc import ABC, abstractmethod
-from contextlib import contextmanager
 
 import torch
 from torch import nn
@@ -32,8 +31,19 @@ def configure_bn_model(model: nn.Module) -> nn.Module:
     BN layers are switched to use *batch* statistics at test time by clearing
     their running estimates, which is what lets these methods track a shifted
     input distribution.
+
+    The model is put in **eval** mode, not train mode. That looks wrong next to
+    the reference TENT implementation, which calls ``train()`` — but it calls
+    it only to force BN onto batch statistics, and its ResNets carry no
+    dropout. Clearing ``running_mean``/``running_var`` achieves the same thing
+    (BN falls back to batch statistics whenever they are ``None``, regardless
+    of mode) while leaving dropout off.
+
+    That matters here: EEGNet is dropout-heavy, and active dropout would
+    randomise both the adaptation gradient and the returned logits, so the same
+    test batch would score differently on every run.
     """
-    model.train()
+    model.eval()
     model.requires_grad_(False)
     for module in model.modules():
         if isinstance(module, nn.modules.batchnorm._BatchNorm):
@@ -43,26 +53,6 @@ def configure_bn_model(model: nn.Module) -> nn.Module:
             module.running_mean = None
             module.running_var = None
     return model
-
-
-@contextmanager
-def inference_pass(model: nn.Module):
-    """Predict with dropout disabled but BatchNorm still on batch statistics.
-
-    :func:`configure_bn_model` clears the running estimates, and BN falls back
-    to batch statistics whenever those are ``None`` — even in eval mode. So
-    switching to eval here turns dropout off without reverting normalisation to
-    stale source statistics.
-
-    Without this, repeated predictions on the same batch differ, which makes
-    evaluation non-reproducible and quietly adds variance to every result.
-    """
-    was_training = model.training
-    model.eval()
-    try:
-        yield
-    finally:
-        model.train(was_training)
 
 
 def collect_bn_params(model: nn.Module) -> list[nn.Parameter]:
