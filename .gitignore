@@ -11,6 +11,25 @@ desktop.ini
 # Environment
 .env
 .env.local
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+
+# Data & artifacts — never commit EEG recordings or checkpoints
+data/
+runs/
+*.edf
+*.fif
+*.npz
+*.pt
+*.ckpt
 
 # Logs
 *.log

@@ -1,0 +1,38 @@
+# Default experiment configuration.
+# Override any field from the CLI, e.g. `eanet eval --set tta.method=tent`
+
+seed: 0
+device: auto          # auto | cpu | cuda
+
+data:
+  source: physionet   # physionet | synthetic
+  subjects_train: [1, 2, 3, 4, 5, 6, 7, 8]
+  subjects_test: [9, 10, 11, 12]
+  runs: [4, 8, 12]    # PhysioNet MI runs: left vs right fist
+  tmin: 0.0
+  tmax: 3.0
+  resample_hz: 128
+  bandpass: [4.0, 38.0]
+  cache_dir: data/physionet
+
+model:
+  name: eegnet        # eegnet | shallow
+  dropout: 0.25
+
+train:
+  epochs: 30
+  batch_size: 64
+  lr: 0.001
+  weight_decay: 0.0001
+
+shift:
+  # Applied to the *test* split only, to emulate deployment conditions.
+  kind: none          # none | noise | scale | channel_dropout | montage | drift
+  severity: 2         # 1..5
+
+tta:
+  method: source      # source | norm | tent | sar
+  lr: 0.00025
+  steps: 1
+  episodic: false     # reset model state between batches
+  sar_margin: 0.4     # entropy threshold multiplier (x ln(num_classes))

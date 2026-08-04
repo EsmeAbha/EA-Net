@@ -1,0 +1,11 @@
+numpy>=1.26
+scipy>=1.11
+scikit-learn>=1.4
+torch>=2.2
+mne>=1.6
+pyyaml>=6.0
+tqdm>=4.66
+
+# dev
+pytest>=8.0
+matplotlib>=3.8
