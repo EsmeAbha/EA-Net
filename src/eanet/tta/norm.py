@@ -5,7 +5,7 @@ from __future__ import annotations
 import torch
 from torch import nn
 
-from eanet.tta.base import TTAMethod, configure_bn_model
+from eanet.tta.base import TTAMethod, configure_bn_model, inference_pass
 
 
 class NormAdapt(TTAMethod):
@@ -25,4 +25,5 @@ class NormAdapt(TTAMethod):
 
     @torch.no_grad()
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        return self.model(x)
+        with inference_pass(self.model):
+            return self.model(x)

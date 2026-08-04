@@ -31,11 +31,26 @@ def test_output_shape(model, batch, method):
 
 @pytest.mark.parametrize("method", ["tent", "sar"])
 def test_adaptation_changes_bn_parameters(model, batch, method):
-    adapter = build_tta(method, copy.deepcopy(model), lr=1e-2)
+    # margin=1.0 lets SAR accept samples up to ln(n_classes); the default 0.4
+    # would reject everything from an untrained model, which is by design.
+    adapter = build_tta(method, copy.deepcopy(model), lr=1e-2, margin=1.0)
     before = [p.detach().clone() for p in collect_bn_params(adapter.model)]
     adapter(batch)
     after = collect_bn_params(adapter.model)
     assert any(not torch.allclose(b, a) for b, a in zip(before, after))
+
+
+def test_sar_skips_adaptation_when_all_samples_are_unreliable(model, batch):
+    """SAR's reliability filter must be able to reject an entire batch.
+
+    An untrained model predicts near-uniformly, so with the default margin
+    every sample sits above the entropy threshold and nothing should update.
+    """
+    adapter = build_tta("sar", copy.deepcopy(model), lr=1e-2, margin=0.01)
+    before = [p.detach().clone() for p in collect_bn_params(adapter.model)]
+    adapter(batch)
+    after = collect_bn_params(adapter.model)
+    assert all(torch.allclose(b, a) for b, a in zip(before, after))
 
 
 def test_source_leaves_model_untouched(model, batch):
@@ -58,11 +73,19 @@ def test_reset_restores_source_state(model, batch, method):
 
 @pytest.mark.parametrize("method", ["tent", "sar"])
 def test_episodic_mode_does_not_accumulate(model, batch, method):
-    adapter = build_tta(method, copy.deepcopy(model), lr=1e-2, episodic=True)
+    adapter = build_tta(method, copy.deepcopy(model), lr=1e-2, margin=1.0, episodic=True)
     first = adapter(batch)
     second = adapter(batch)
-    # With a reset before each batch, identical input must give identical output.
+    # Reset before each batch plus a dropout-free prediction pass means the same
+    # input must yield exactly the same output.
     assert torch.allclose(first, second, atol=1e-5)
+
+
+@pytest.mark.parametrize("method", METHODS)
+def test_predictions_are_deterministic(model, batch, method):
+    """Repeated prediction on one batch must not vary with dropout sampling."""
+    adapter = build_tta(method, copy.deepcopy(model), lr=1e-2, episodic=True)
+    assert torch.allclose(adapter(batch), adapter(batch), atol=1e-6)
 
 
 @pytest.mark.parametrize("method", METHODS)

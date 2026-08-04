@@ -10,6 +10,7 @@ from eanet.tta.base import (
     collect_bn_params,
     configure_bn_model,
     copy_state,
+    inference_pass,
     load_state,
     softmax_entropy,
 )
@@ -53,7 +54,7 @@ class Tent(TTAMethod):
             self.optimizer.zero_grad(set_to_none=True)
         # Re-predict with the updated parameters so the returned logits reflect
         # the adaptation this batch paid for.
-        with torch.no_grad():
+        with inference_pass(self.model), torch.no_grad():
             return self.model(x)
 
     def reset(self) -> None:

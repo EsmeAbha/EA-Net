@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import copy
 from abc import ABC, abstractmethod
+from contextlib import contextmanager
 
 import torch
 from torch import nn
@@ -42,6 +43,26 @@ def configure_bn_model(model: nn.Module) -> nn.Module:
             module.running_mean = None
             module.running_var = None
     return model
+
+
+@contextmanager
+def inference_pass(model: nn.Module):
+    """Predict with dropout disabled but BatchNorm still on batch statistics.
+
+    :func:`configure_bn_model` clears the running estimates, and BN falls back
+    to batch statistics whenever those are ``None`` — even in eval mode. So
+    switching to eval here turns dropout off without reverting normalisation to
+    stale source statistics.
+
+    Without this, repeated predictions on the same batch differ, which makes
+    evaluation non-reproducible and quietly adds variance to every result.
+    """
+    was_training = model.training
+    model.eval()
+    try:
+        yield
+    finally:
+        model.train(was_training)
 
 
 def collect_bn_params(model: nn.Module) -> list[nn.Parameter]:
