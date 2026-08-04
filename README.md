@@ -33,7 +33,7 @@ recalibration), `tent` (entropy minimisation on BN affine parameters), `sar`
 pip install -e .
 ```
 
-Requires Python ≥3.10 and PyTorch ≥2.2. CPU is fine at this scale.
+Requires Python >=3.10 and PyTorch >=2.2. CPU is fine at this scale.
 
 ## Use
 
