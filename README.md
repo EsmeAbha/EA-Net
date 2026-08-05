@@ -8,7 +8,7 @@ EEG decoders degrade when they leave the lab that trained them — different
 amplifier, different cap, different subject, different day. Test-time
 adaptation (TTA) is the standard answer to that problem in vision and speech,
 but recent reviews of EEG foundation models note that its application to EEG
-[remains underexplored](https://arxiv.org/abs/2507.11783). This repository is a
+. This repository is a
 controlled harness for measuring whether it actually helps here.
 
 ## What it does
